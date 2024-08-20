@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = ["stack-zero"]
 
 [workspace.dependencies]
@@ -13,3 +14,13 @@ serde_json = { version = "1.0.108" }
 serde-enum-str = "0.4.0"
 jsonwebtoken = "9.1.0"
 chrono = { version = "0.4.31", features = ["serde"] }
+
+# ssl: Seems to be needed for pulling images from docker hub.
+bollard = { version = "0.15.0", features = ["ssl"] }
+rstest = { version = "0.18.2" }
+diesel = { version = "2.1.4", features = ["chrono"] }
+diesel-async = { version = "0.4.1", features = ["postgres", "deadpool"] }
+# Must match the version referred by diesel-async
+deadpool = { version = "0.9.5" }
+tokio-postgres = { version = "0.7.10" }
+derive_more = { version = "0.99.17" }

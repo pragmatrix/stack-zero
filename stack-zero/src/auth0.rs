@@ -1,6 +1,7 @@
 use std::env;
 
 use anyhow::{Context, Result};
+use jsonwebtoken::jwk;
 
 #[derive(Debug)]
 pub struct Config {
@@ -24,5 +25,11 @@ impl Config {
             client_id,
             client_secret,
         })
+    }
+
+    /// Downloads the JWK set from the auth0 domain.
+    pub async fn download_jwk_set(&self) -> Result<jwk::JwkSet> {
+        let url = format!("https://{}/.well-known/jwks.json", &self.domain);
+        Ok(reqwest::get(url).await?.json::<jwk::JwkSet>().await?)
     }
 }

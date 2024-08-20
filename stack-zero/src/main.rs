@@ -8,9 +8,13 @@ use axum::{
     routing::get,
     Router,
 };
+use chrono::NaiveDateTime;
+use chrono::Utc;
+use derive_more::Constructor;
+use diesel_async::{pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection};
 use dotenv::dotenv;
 use jsonwebtoken as jwt;
-use jwt::jwk::{self, JwkSet};
+use jwt::jwk::JwkSet;
 use serde::Deserialize;
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use tokio::net::TcpListener;
@@ -19,21 +23,20 @@ use url::Url;
 mod anyhow;
 mod auth0;
 mod identity;
+mod schema;
+#[cfg(test)]
+mod test_helper;
+mod user;
 
 use crate::id_token::IdToken;
 use anyhow::AppError;
 pub use identity::*;
 
-#[derive(Debug)]
+#[derive(Constructor)]
 struct Config {
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
-}
-
-impl Config {
-    fn new(auth0: auth0::Config, jwk_set: JwkSet) -> Self {
-        Self { auth0, jwk_set }
-    }
+    pub connection_pool: deadpool::managed::Pool<AsyncDieselConnectionManager<AsyncPgConnection>>,
 }
 
 #[tokio::main]
@@ -42,11 +45,26 @@ async fn main() -> Result<()> {
 
     let auth0_config = auth0::Config::from_env()?;
 
-    let jwks = download_jwk_set(&auth0_config).await?;
+    let jwks = auth0_config.download_jwk_set().await?;
 
     println!("jwk set: {:?}", jwks);
 
-    let config = Arc::new(Config::new(auth0_config, jwks));
+    let connection_manager = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
+        std::env::var("DATABASE_URL")?,
+    );
+
+    let connection_pool = deadpool::managed::Pool::builder(connection_manager).build()?;
+
+    let mut connection = connection_pool.get().await?;
+
+    // let users = users::table
+    //     .select(User::as_select())
+    //     .load(&mut connection)
+    //     .await?;
+
+    // println!("Users: {:?}", users);
+
+    let config = Arc::new(Config::new(auth0_config, jwks, connection_pool));
 
     let app = Router::new()
         .route("/login", get(login))
@@ -167,7 +185,17 @@ async fn authorized(authorization_code: &str, config: &Config) -> Result<impl In
                 &config.jwk_set,
                 &id_token,
             )?;
-            println!("Token successfully validated");
+            println!("Token successfully validated, inserting user");
+            let mut connection = config.connection_pool.get().await?;
+            let claims = &token.claims;
+            let user = crate::user::users::get_or_create(
+                &mut connection,
+                &claims.profile.name,
+                &claims.email.email,
+                &Utc::now().naive_utc(),
+            )
+            .await?;
+            println!("User created with id: {}", user.id);
         }
         TokenResponse::Error {
             error,
@@ -179,12 +207,6 @@ async fn authorized(authorization_code: &str, config: &Config) -> Result<impl In
     println!("{token_response:?}");
 
     Ok(())
-}
-
-/// Downloads the JWK set from the auth0 domain.
-async fn download_jwk_set(config: &auth0::Config) -> Result<jwk::JwkSet> {
-    let url = format!("https://{}/.well-known/jwks.json", &config.domain);
-    Ok(reqwest::get(url).await?.json::<jwk::JwkSet>().await?)
 }
 
 #[cfg(test)]
