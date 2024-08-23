@@ -8,13 +8,13 @@ use axum::{
     routing::get,
     Router,
 };
-use chrono::NaiveDateTime;
-use chrono::Utc;
+use chrono::{DateTime, NaiveDateTime};
+use chrono::{FixedOffset, Utc};
 use derive_more::Constructor;
-use diesel_async::{pooled_connection::AsyncDieselConnectionManager, AsyncPgConnection};
 use dotenv::dotenv;
 use jsonwebtoken as jwt;
 use jwt::jwk::JwkSet;
+use sea_orm::{prelude::DateTimeWithTimeZone, Database, DatabaseConnection};
 use serde::Deserialize;
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use tokio::net::TcpListener;
@@ -36,7 +36,7 @@ pub use identity::*;
 struct Config {
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
-    pub connection_pool: deadpool::managed::Pool<AsyncDieselConnectionManager<AsyncPgConnection>>,
+    pub db_connection: DatabaseConnection,
 }
 
 #[tokio::main]
@@ -49,13 +49,7 @@ async fn main() -> Result<()> {
 
     println!("jwk set: {:?}", jwks);
 
-    let connection_manager = AsyncDieselConnectionManager::<diesel_async::AsyncPgConnection>::new(
-        std::env::var("DATABASE_URL")?,
-    );
-
-    let connection_pool = deadpool::managed::Pool::builder(connection_manager).build()?;
-
-    let mut connection = connection_pool.get().await?;
+    let database = Database::connect(std::env::var("DATABASE_URL")?).await?;
 
     // let users = users::table
     //     .select(User::as_select())
@@ -64,7 +58,7 @@ async fn main() -> Result<()> {
 
     // println!("Users: {:?}", users);
 
-    let config = Arc::new(Config::new(auth0_config, jwks, connection_pool));
+    let config = Arc::new(Config::new(auth0_config, jwks, database));
 
     let app = Router::new()
         .route("/login", get(login))
@@ -164,7 +158,7 @@ async fn authorized(authorization_code: &str, config: &Config) -> Result<impl In
         .post(format!("https://{}/oauth/token", auth0.domain))
         .form(&[
             ("grant_type", "authorization_code"), // ("redirect_uri", "YOUR_CALLBACK_URI"),
-            ("code", &authorization_code),
+            ("code", authorization_code),
             // required, and must be identical to the authorize/ request.
             ("redirect_uri", &auth0.callback_url),
             ("client_id", auth0.client_id.as_str()),
@@ -181,18 +175,18 @@ async fn authorized(authorization_code: &str, config: &Config) -> Result<impl In
         TokenResponse::Success { id_token, .. } => {
             let token = IdToken::validate(
                 &(format!("https://{}/", config.auth0.domain)),
-                &(&config.auth0.client_id),
+                &config.auth0.client_id,
                 &config.jwk_set,
-                &id_token,
+                id_token,
             )?;
             println!("Token successfully validated, inserting user");
-            let mut connection = config.connection_pool.get().await?;
+            let connection = &config.db_connection;
             let claims = &token.claims;
             let user = crate::user::users::get_or_create(
-                &mut connection,
+                connection,
                 &claims.profile.name,
                 &claims.email.email,
-                &Utc::now().naive_utc(),
+                DateTime::<FixedOffset>::from(Utc::now()),
             )
             .await?;
             println!("User created with id: {}", user.id);

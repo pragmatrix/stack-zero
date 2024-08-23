@@ -1,11 +1,9 @@
-use std::{collections::HashMap, default};
+use std::collections::HashMap;
 
 use anyhow::{Context, Result};
 use bollard::{
-    container::{
-        self, Config, CreateContainerOptions, RemoveContainerOptions, StartContainerOptions,
-    },
-    service::{HostConfig, PortBinding, PortMap},
+    container::{Config, CreateContainerOptions, RemoveContainerOptions, StartContainerOptions},
+    service::{HostConfig, PortBinding},
     Docker,
 };
 use rstest::fixture;

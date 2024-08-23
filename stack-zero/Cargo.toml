@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+entity = { path = "../entity" }
 axum = { workspace = true }
 tokio = { workspace = true }
 dotenv = { workspace = true }
@@ -15,10 +16,8 @@ serde_json = { workspace = true }
 serde-enum-str = { workspace = true }
 jsonwebtoken = { workspace = true }
 chrono = { workspace = true }
-diesel = { workspace = true }
-diesel-async = { workspace = true }
 derive_more = { workspace = true }
-deadpool = { workspace = true }
+sea-orm = { workspace = true }
 
 [dev-dependencies]
 bollard = { workspace = true }
