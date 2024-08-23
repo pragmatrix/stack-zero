@@ -8,13 +8,12 @@ use axum::{
     routing::get,
     Router,
 };
-use chrono::{DateTime, NaiveDateTime};
-use chrono::{FixedOffset, Utc};
+use chrono::{DateTime, FixedOffset, Utc};
 use derive_more::Constructor;
 use dotenv::dotenv;
 use jsonwebtoken as jwt;
 use jwt::jwk::JwkSet;
-use sea_orm::{prelude::DateTimeWithTimeZone, Database, DatabaseConnection};
+use sea_orm::{Database, DatabaseConnection};
 use serde::Deserialize;
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use tokio::net::TcpListener;
@@ -23,7 +22,6 @@ use url::Url;
 mod anyhow;
 mod auth0;
 mod identity;
-mod schema;
 #[cfg(test)]
 mod test_helper;
 mod user;
