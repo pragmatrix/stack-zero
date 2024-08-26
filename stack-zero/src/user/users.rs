@@ -31,33 +31,40 @@ pub async fn get_or_create(
         .exec(&txn)
         .await?;
 
+    txn.commit().await?;
+
     Ok(new_user)
 }
 
 #[cfg(test)]
 mod tests {
-    use std::future::Future;
+    use std::{env, future::Future};
 
     use anyhow::Result;
+    use chrono::{DateTime, FixedOffset, Utc};
+    use dotenv::dotenv;
     use rstest::*;
-    use tokio_postgres::NoTls;
+    use sea_orm::Database;
 
     use crate::test_helper::postgres_container;
-
     #[rstest]
     #[tokio::test]
+    #[ignore = "manually only"]
     async fn new_user(postgres_container: impl Future<Output = Result<String>>) -> Result<()> {
+        dotenv()?;
+
         let container = postgres_container.await?;
-
         println!("Connecting to container: {container}");
-        // let connection = AsyncPgConnection::establish(&container).await?;
 
-        let container = "postgres://armin:test@localhost:5432/stack-zero";
+        // let container = "postgres://armin:test@localhost:5432/stack-zero";
 
-        let _connection = tokio_postgres::connect(container, NoTls).await?;
+        let _database = Database::connect(env::var("DATABASE_URL")?).await?;
 
-        todo!("Create a new user");
+        let user =
+            super::get_or_create(&_database, "John Doe", "john@doe.com", Utc::now().into()).await?;
 
-        // Ok(())
+        println!("User in db: {user:?}");
+
+        Ok(())
     }
 }
