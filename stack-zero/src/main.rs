@@ -18,6 +18,7 @@ use serde::Deserialize;
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use tokio::net::TcpListener;
 use url::Url;
+use user::users;
 
 mod anyhow;
 mod auth0;
@@ -48,13 +49,6 @@ async fn main() -> Result<()> {
     println!("jwk set: {:?}", jwks);
 
     let database = Database::connect(env::var("DATABASE_URL")?).await?;
-
-    // let users = users::table
-    //     .select(User::as_select())
-    //     .load(&mut connection)
-    //     .await?;
-
-    // println!("Users: {:?}", users);
 
     let config = Arc::new(Config::new(auth0_config, jwks, database));
 
@@ -180,11 +174,11 @@ async fn authorized(authorization_code: &str, config: &Config) -> Result<impl In
             println!("Token successfully validated, inserting user");
             let connection = &config.db_connection;
             let claims = &token.claims;
-            let user = crate::user::users::get_or_create(
+            let user = users::get_or_create(
                 connection,
                 &claims.profile.name,
                 &claims.email.email,
-                DateTime::<FixedOffset>::from(Utc::now()),
+                Utc::now().into(),
             )
             .await?;
             println!("User created with id: {}", user.id);
