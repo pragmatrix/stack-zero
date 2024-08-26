@@ -24,4 +24,3 @@ sea-orm = { workspace = true }
 [dev-dependencies]
 bollard = { workspace = true }
 rstest = { workspace = true }
-tokio-postgres = { workspace = true }

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future};
+use std::{collections::HashMap, env, future::Future};
 
 use anyhow::{Context, Result};
 use bollard::{
@@ -6,21 +6,20 @@ use bollard::{
     service::{HostConfig, PortBinding},
     Docker,
 };
+use dotenv::dotenv;
 use rstest::{fixture, rstest};
-use tokio_postgres::NoTls;
+use sea_orm::Database;
 
 #[rstest]
 #[tokio::test]
 async fn recreate_container_and_connect_to_db(
     postgres_container: impl Future<Output = Result<String>>,
 ) -> Result<()> {
+    dotenv()?;
+
     let container = postgres_container.await?;
 
-    println!("Connecting to container: {container}");
-
-    let container = "postgres://armin:test@localhost:5432/stack-zero";
-
-    let _connection = tokio_postgres::connect(container, NoTls).await?;
+    let _database = Database::connect(env::var("DATABASE_URL")?).await?;
 
     Ok(())
 }

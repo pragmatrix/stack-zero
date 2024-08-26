@@ -56,8 +56,6 @@ mod tests {
         let container = postgres_container.await?;
         println!("Connecting to container: {container}");
 
-        // let container = "postgres://armin:test@localhost:5432/stack-zero";
-
         let _database = Database::connect(env::var("DATABASE_URL")?).await?;
 
         let user =
