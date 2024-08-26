@@ -3,6 +3,8 @@ name = "stack-zero"
 version = "0.1.0"
 edition = "2021"
 
+default-run = "stack-zero"
+
 [dependencies]
 entity = { path = "../entity" }
 axum = { workspace = true }
