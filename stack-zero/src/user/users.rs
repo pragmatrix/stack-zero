@@ -42,7 +42,7 @@ mod tests {
     use rstest::*;
     use tokio_postgres::NoTls;
 
-    use crate::test_helper::{self, postgres_container};
+    use crate::test_helper::postgres_container;
 
     #[rstest]
     #[tokio::test]
@@ -54,8 +54,10 @@ mod tests {
 
         let container = "postgres://armin:test@localhost:5432/stack-zero";
 
-        let connection = tokio_postgres::connect(&container, NoTls).await?;
+        let _connection = tokio_postgres::connect(container, NoTls).await?;
 
-        Ok(())
+        todo!("Create a new user");
+
+        // Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 
 use anyhow::{Context, Result};
 use bollard::{
@@ -6,9 +6,26 @@ use bollard::{
     service::{HostConfig, PortBinding},
     Docker,
 };
-use rstest::fixture;
+use rstest::{fixture, rstest};
+use tokio_postgres::NoTls;
 
-const IMAGE_NAME: &str = "postgres:16.1";
+#[rstest]
+#[tokio::test]
+async fn recreate_container_and_connect_to_db(
+    postgres_container: impl Future<Output = Result<String>>,
+) -> Result<()> {
+    let container = postgres_container.await?;
+
+    println!("Connecting to container: {container}");
+
+    let container = "postgres://armin:test@localhost:5432/stack-zero";
+
+    let _connection = tokio_postgres::connect(container, NoTls).await?;
+
+    Ok(())
+}
+
+const IMAGE_NAME: &str = "postgres:16.4";
 const CONTAINER_NAME: &str = "stack-zero-postgres-test";
 const POSTGRES_PASSWORD: &str = "stack-zero-test";
 const POSTGRES_DB: &str = "stack-zero";
@@ -18,7 +35,7 @@ pub async fn postgres_container() -> Result<String> {
     let docker = Docker::connect_with_local_defaults()?;
 
     // PostgreSQL configuration
-    let user_var: &str = &format!("POSTGRES_USER=postgres");
+    let user_var: &str = "POSTGRES_USER=postgres";
     let password_var: &str = &format!("POSTGRES_PASSWORD={POSTGRES_PASSWORD}");
     let db_var: &str = &format!("POSTGRES_DB={POSTGRES_DB}");
     let env_vars = vec![user_var, password_var, db_var];
