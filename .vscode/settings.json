@@ -1,6 +1,9 @@
 {
     "cSpell.words": [
+        "deadpool",
         "dotenv",
+        "Insertable",
+        "POSTGRESS",
         "reqwest"
-    ]
+   ],
 }

@@ -1,5 +1,6 @@
 [workspace]
-members = ["stack-zero"]
+resolver = "2"
+members = ["stack-zero", "migration", "entity"]
 
 [workspace.dependencies]
 dotenv = "0.15.0"
@@ -13,3 +14,10 @@ serde_json = { version = "1.0.108" }
 serde-enum-str = "0.4.0"
 jsonwebtoken = "9.1.0"
 chrono = { version = "0.4.31", features = ["serde"] }
+
+# ssl: Seems to be needed for pulling images from docker hub.
+bollard = { version = "0.17.1", features = ["ssl"] }
+rstest = { version = "0.18.2" }
+sea-orm = { version = "1.0.0", features = ["sqlx-postgres", "macros", "runtime-tokio-native-tls", "with-chrono", "with-json", "with-uuid"] }
+derive_more = { version = "0.99.17" }
+uuid = { version = "1.10.0", features = ["v4"] }
