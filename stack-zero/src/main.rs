@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{env, net::SocketAddr, sync::Arc};
 
 use ::anyhow::Result;
 use axum::{
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
 
     println!("jwk set: {:?}", jwks);
 
-    let database = Database::connect(std::env::var("DATABASE_URL")?).await?;
+    let database = Database::connect(env::var("DATABASE_URL")?).await?;
 
     // let users = users::table
     //     .select(User::as_select())
