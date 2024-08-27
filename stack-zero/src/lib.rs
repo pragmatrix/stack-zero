@@ -2,9 +2,8 @@ use std::{env, net::SocketAddr, sync::Arc};
 
 use ::anyhow::Result;
 use axum::{
-    extract::{Query, State},
-    response::IntoResponse,
-    response::Redirect,
+    extract::{FromRef, Query, State},
+    response::{IntoResponse, Redirect},
     routing::get,
     Router,
 };
@@ -31,43 +30,40 @@ use crate::id_token::IdToken;
 use anyhow::AppError;
 pub use identity::*;
 
-#[derive(Constructor)]
-struct Config {
+pub struct StackZero {
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
     pub db_connection: DatabaseConnection,
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    dotenv()?;
+impl StackZero {
+    pub async fn new() -> Result<Self> {
+        let auth0 = auth0::Config::from_env()?;
 
-    let auth0_config = auth0::Config::from_env()?;
+        let jwk_set = auth0.download_jwk_set().await?;
 
-    let jwks = auth0_config.download_jwk_set().await?;
+        println!("jwk set: {:?}", jwk_set);
 
-    println!("jwk set: {:?}", jwks);
+        let database = Database::connect(env::var("DATABASE_URL")?).await?;
+        Ok(Self {
+            auth0,
+            jwk_set,
+            db_connection: database,
+        })
+    }
 
-    let database = Database::connect(env::var("DATABASE_URL")?).await?;
-
-    let config = Arc::new(Config::new(auth0_config, jwks, database));
-
-    let app = Router::new()
-        .route("/login", get(login))
-        .route("/callback", get(callback))
-        .with_state(config);
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3030));
-    println!("Listening on http://{}", addr);
-
-    let listener = TcpListener::bind(addr).await?;
-
-    axum::serve(listener, app).await?;
-
-    Ok(())
+    pub fn install_routes<State>(router: Router<State>) -> Router<State>
+    where
+        Arc<StackZero>: FromRef<State>,
+        State: Clone + Send + Sync + 'static,
+    {
+        router
+            .route("/login", get(login))
+            .route("/callback", get(callback))
+    }
 }
 
-async fn login(State(state): State<Arc<Config>>) -> impl IntoResponse {
+async fn login(State(state): State<Arc<StackZero>>) -> impl IntoResponse {
     // TODO: we can pre-create the full url in the configuration.
 
     let auth0 = &state.auth0;
@@ -138,12 +134,12 @@ enum TokenResponseError {
 
 async fn callback(
     Query(query_params): Query<AuthCallbackQuery>,
-    State(state): State<Arc<Config>>,
+    State(state): State<Arc<StackZero>>,
 ) -> Result<impl IntoResponse, AppError> {
     Ok(authorized(&query_params.code, &state).await?)
 }
 
-async fn authorized(authorization_code: &str, config: &Config) -> Result<impl IntoResponse> {
+async fn authorized(authorization_code: &str, config: &StackZero) -> Result<impl IntoResponse> {
     let auth0 = &config.auth0;
 
     let token_response = reqwest::Client::new()
