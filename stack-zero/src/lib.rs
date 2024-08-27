@@ -30,6 +30,7 @@ use crate::id_token::IdToken;
 use anyhow::AppError;
 pub use identity::*;
 
+#[derive(Debug)]
 pub struct StackZero {
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
