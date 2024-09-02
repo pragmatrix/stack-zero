@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 use anyhow::Result;
 use axum::{extract::FromRef, Router};
 use dotenv::dotenv;
-use stack_zero::StackZero;
+use stack_zero::{Config, StackZero};
 use tokio::net::TcpListener;
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ impl FromRef<MyState> for Arc<StackZero> {
 async fn main() -> Result<()> {
     dotenv()?;
 
-    let stack_zero = StackZero::new().await?;
+    let stack_zero = StackZero::new(Config::default()).await?;
 
     let app = Router::new();
     let app = StackZero::install_routes(app).with_state(MyState {

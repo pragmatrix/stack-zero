@@ -17,8 +17,7 @@ async fn recreate_container_and_connect_to_db(
 ) -> Result<()> {
     dotenv()?;
 
-    let container = postgres_container.await?;
-
+    let _container = postgres_container.await?;
     let _database = Database::connect(env::var("DATABASE_URL")?).await?;
 
     Ok(())

@@ -7,3 +7,4 @@ edition = "2021"
 sea-orm = "1.0.0"
 chrono = { workspace = true }
 uuid = { workspace = true }
+serde = { workspace = true }

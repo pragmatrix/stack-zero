@@ -1,4 +1,4 @@
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{env, path::PathBuf, sync::Arc};
 
 use ::anyhow::Result;
 use axum::{
@@ -7,27 +7,29 @@ use axum::{
     routing::get,
     Router,
 };
-use chrono::{DateTime, FixedOffset, Utc};
-use derive_more::Constructor;
-use dotenv::dotenv;
+use chrono::Utc;
 use jsonwebtoken as jwt;
 use jwt::jwk::JwkSet;
-use sea_orm::{Database, DatabaseConnection};
-use serde::Deserialize;
+use sea_orm::{Database, DatabaseConnection, EntityTrait};
+use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
-use tokio::net::TcpListener;
+use tower_http::services::ServeDir;
 use url::Url;
+
+use crate::id_token::IdToken;
 use user::users;
+use view_renderer::*;
 
 mod anyhow;
 mod auth0;
 mod identity;
+pub mod respond;
 #[cfg(test)]
 mod test_helper;
 mod user;
+mod view_renderer;
 
-use crate::id_token::IdToken;
-use anyhow::AppError;
+pub use anyhow::AppError;
 pub use identity::*;
 
 #[derive(Debug)]
@@ -35,10 +37,26 @@ pub struct StackZero {
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
     pub db_connection: DatabaseConnection,
+    pub template_renderer: ViewRenderer,
+}
+
+#[derive(Clone)]
+pub struct Config {
+    pub template_dir: PathBuf,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            template_dir: "assets".into(),
+        }
+    }
 }
 
 impl StackZero {
-    pub async fn new() -> Result<Self> {
+    pub async fn new(config: Config) -> Result<Self> {
+        let template_renderer = ViewRenderer::from_dir(&config.template_dir)?;
+
         let auth0 = auth0::Config::from_env()?;
 
         let jwk_set = auth0.download_jwk_set().await?;
@@ -50,6 +68,7 @@ impl StackZero {
             auth0,
             jwk_set,
             db_connection: database,
+            template_renderer,
         })
     }
 
@@ -58,9 +77,22 @@ impl StackZero {
         Arc<StackZero>: FromRef<State>,
         State: Clone + Send + Sync + 'static,
     {
+        let static_files_service = ServeDir::new("assets/static");
+
         router
             .route("/login", get(login))
             .route("/callback", get(callback))
+            .nest_service("/static", static_files_service)
+    }
+
+    pub fn render(&self, key: &str, data: impl Serialize) -> Result<String> {
+        self.template_renderer.render(key, data)
+    }
+
+    pub async fn users(&self) -> Result<Vec<entity::user::Model>> {
+        Ok(entity::user::Entity::find()
+            .all(&self.db_connection)
+            .await?)
     }
 }
 

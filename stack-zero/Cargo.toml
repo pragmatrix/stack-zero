@@ -18,6 +18,8 @@ jsonwebtoken = { workspace = true }
 chrono = { workspace = true }
 derive_more = { workspace = true }
 sea-orm = { workspace = true }
+tera = { workspace = true }
+tower-http = { workspace = true }
 
 [dev-dependencies]
 bollard = { workspace = true }

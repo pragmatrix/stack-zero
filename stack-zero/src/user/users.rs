@@ -41,7 +41,7 @@ mod tests {
     use std::{env, future::Future};
 
     use anyhow::Result;
-    use chrono::{DateTime, FixedOffset, Utc};
+    use chrono::Utc;
     use dotenv::dotenv;
     use rstest::*;
     use sea_orm::Database;
