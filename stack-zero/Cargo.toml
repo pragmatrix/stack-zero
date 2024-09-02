@@ -20,6 +20,7 @@ derive_more = { workspace = true }
 sea-orm = { workspace = true }
 tera = { workspace = true }
 tower-http = { workspace = true }
+futures-util = { workspace = true }
 
 [dev-dependencies]
 bollard = { workspace = true }

@@ -3,10 +3,12 @@ use std::{collections::HashMap, env, future::Future};
 use anyhow::{Context, Result};
 use bollard::{
     container::{Config, CreateContainerOptions, RemoveContainerOptions, StartContainerOptions},
+    image::{self, CreateImageOptions},
     service::{HostConfig, PortBinding},
     Docker,
 };
 use dotenv::dotenv;
+use futures_util::TryStreamExt;
 use rstest::{fixture, rstest};
 use sea_orm::Database;
 
@@ -23,8 +25,15 @@ async fn recreate_container_and_connect_to_db(
     Ok(())
 }
 
-const IMAGE_NAME: &str = "postgres:16.4";
-const CONTAINER_NAME: &str = "stack-zero-postgres-test";
+mod postgres {
+    pub const IMAGE_NAME: &str = "postgres:16.4";
+    pub const CONTAINER_NAME: &str = "stack-zero-postgres-test";
+}
+mod redis {
+    pub const IMAGE_NAME: &str = "redis/redis-stack:7.4.0-v0";
+    pub const CONTAINER_NAME: &str = "stack-zero-redis-test";
+}
+
 const POSTGRES_PASSWORD: &str = "stack-zero-test";
 const POSTGRES_DB: &str = "stack-zero";
 
@@ -42,8 +51,8 @@ pub async fn postgres_container() -> Result<String> {
     port_bindings.insert(
         "5432/tcp".to_string(),
         Some(vec![PortBinding {
-            host_ip: Some("127.0.0.1".to_string()), // Bind to all interfaces
-            host_port: Some("5433".to_string()),    // Map to the same port on the host
+            host_ip: Some("127.0.0.1".to_string()),
+            host_port: Some("5433".to_string()),
         }]),
     );
 
@@ -52,14 +61,18 @@ pub async fn postgres_container() -> Result<String> {
         ..Default::default()
     };
 
+    let image_name = postgres::IMAGE_NAME;
+
+    pull_image(&docker, image_name).await?;
+
     let config = Config {
-        image: Some(IMAGE_NAME),
+        image: Some(image_name),
         env: Some(env_vars),
         host_config: Some(host_config),
         ..Default::default()
     };
 
-    let container_name = CONTAINER_NAME;
+    let container_name = postgres::CONTAINER_NAME;
 
     let create_options = CreateContainerOptions {
         name: container_name.to_string(),
@@ -77,6 +90,64 @@ pub async fn postgres_container() -> Result<String> {
     Ok(format!(
         "postgres://postgres:{POSTGRES_PASSWORD}@localhost:5433/stack-zero"
     )) // Connection string (adjust as needed)
+}
+
+/// Redis container for session management.
+#[fixture]
+pub async fn redis_container() -> Result<String> {
+    let docker = Docker::connect_with_local_defaults()?;
+
+    let env_vars = vec![];
+
+    let mut port_bindings = HashMap::new();
+    port_bindings.insert(
+        "6379/tcp".to_string(),
+        Some(vec![PortBinding {
+            host_ip: Some("127.0.0.1".to_string()), // Bind to all interfaces
+            host_port: Some("6379".to_string()),    // Map to the same port on the host
+        }]),
+    );
+
+    port_bindings.insert(
+        "8001/tcp".to_string(),
+        Some(vec![PortBinding {
+            host_ip: Some("127.0.0.1".to_string()), // Bind to all interfaces
+            host_port: Some("8001".to_string()),    // Map to the same port on the host
+        }]),
+    );
+
+    let host_config = HostConfig {
+        port_bindings: Some(port_bindings),
+        ..Default::default()
+    };
+
+    let image_name = redis::IMAGE_NAME;
+
+    pull_image(&docker, image_name).await?;
+
+    let config = Config {
+        image: Some(image_name),
+        env: Some(env_vars),
+        host_config: Some(host_config),
+        ..Default::default()
+    };
+
+    let container_name = redis::CONTAINER_NAME;
+
+    let create_options = CreateContainerOptions {
+        name: container_name.to_string(),
+        ..Default::default()
+    };
+
+    recreate_container(&docker, create_options, config)
+        .await
+        .context("Recreating container")?;
+
+    docker
+        .start_container(container_name, None::<StartContainerOptions<String>>)
+        .await?;
+
+    Ok("".into())
 }
 
 async fn recreate_container(
@@ -113,6 +184,20 @@ async fn recreate_container(
         .create_container(Some(create_options), config)
         .await
         .context("Creating container")?;
+
+    Ok(())
+}
+
+async fn pull_image(docker: &Docker, image_name: &str) -> Result<()> {
+    let options = CreateImageOptions {
+        from_image: image_name,
+        ..CreateImageOptions::default()
+    };
+
+    docker
+        .create_image(Some(options), None, None)
+        .try_collect::<Vec<_>>()
+        .await?;
 
     Ok(())
 }

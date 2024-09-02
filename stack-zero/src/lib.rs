@@ -28,6 +28,7 @@ pub mod respond;
 mod test_helper;
 mod user;
 mod view_renderer;
+mod session;
 
 pub use anyhow::AppError;
 pub use identity::*;

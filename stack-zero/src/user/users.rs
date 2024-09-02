@@ -47,6 +47,7 @@ mod tests {
     use sea_orm::Database;
 
     use crate::test_helper::postgres_container;
+
     #[rstest]
     #[tokio::test]
     #[ignore = "manually only"]
