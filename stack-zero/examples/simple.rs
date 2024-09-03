@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     let stack_zero = StackZero::new(Config::default()).await?;
 
     let app = Router::new();
-    let app = StackZero::install_routes(app).with_state(MyState {
+    let app = stack_zero.install_routes(app).with_state(MyState {
         sz: Arc::new(stack_zero),
     });
 
