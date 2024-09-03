@@ -1,6 +1,6 @@
-use std::{env, path::PathBuf, sync::Arc};
+use std::{default, env, path::PathBuf, sync::Arc};
 
-use ::anyhow::Result;
+use ::anyhow::{Context, Result};
 use axum::{
     extract::{FromRef, Query, State},
     response::{IntoResponse, Redirect},
@@ -13,7 +13,10 @@ use jwt::jwk::JwkSet;
 use sea_orm::{Database, DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
+use tokio::task::JoinHandle;
 use tower_http::services::ServeDir;
+use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 use url::Url;
 
 use crate::id_token::IdToken;
@@ -24,32 +27,54 @@ mod anyhow;
 mod auth0;
 mod identity;
 pub mod respond;
+mod session;
 #[cfg(test)]
 mod test_helper;
 mod user;
 mod view_renderer;
-mod session;
 
 pub use anyhow::AppError;
 pub use identity::*;
 
 #[derive(Debug)]
 pub struct StackZero {
+    pub config: Config,
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
     pub db_connection: DatabaseConnection,
+    pub redis_pool: RedisPool,
+    pub redis_connection: JoinHandle<Result<(), RedisError>>,
     pub template_renderer: ViewRenderer,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+pub enum Environment {
+    #[default]
+    Development,
+    Production,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub template_dir: PathBuf,
+    pub environment: Environment,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             template_dir: "assets".into(),
+            environment: Environment::default(),
+        }
+    }
+}
+
+impl Config {
+    /// Cookies should be usable only over HTTPS?
+    pub fn use_secure_cookies(&self) -> bool {
+        match self.environment {
+            Environment::Development => false,
+            Environment::Production => true,
         }
     }
 }
@@ -65,25 +90,48 @@ impl StackZero {
         println!("jwk set: {:?}", jwk_set);
 
         let database = Database::connect(env::var("DATABASE_URL")?).await?;
+
+        let redis_config = RedisConfig::default();
+
+        let pool = RedisPool::new(RedisConfig::default(), None, None, None, 6)?;
+
+        let redis_conn = pool.connect();
+        pool.wait_for_connect()
+            .await
+            .with_context(|| format!("Connecting Redis pool: {:?}", redis_config.server))?;
+
         Ok(Self {
+            config,
             auth0,
             jwk_set,
+            redis_pool: pool,
+            redis_connection: redis_conn,
             db_connection: database,
             template_renderer,
         })
     }
 
-    pub fn install_routes<State>(router: Router<State>) -> Router<State>
+    pub fn install_routes<State>(&self, router: Router<State>) -> Router<State>
     where
         Arc<StackZero>: FromRef<State>,
         State: Clone + Send + Sync + 'static,
     {
         let static_files_service = ServeDir::new("assets/static");
 
+        // let session_store = MemoryStore::default();
+
+        let session_store = RedisStore::new(self.redis_pool.clone());
+
+        let session_layer = SessionManagerLayer::new(session_store)
+            .with_secure(self.config.use_secure_cookies())
+            // TODO: configure?
+            .with_expiry(Expiry::OnInactivity(Duration::seconds(20)));
+
         router
             .route("/login", get(login))
             .route("/callback", get(callback))
             .nest_service("/static", static_files_service)
+            .layer(session_layer)
     }
 
     pub fn render(&self, key: &str, data: impl Serialize) -> Result<String> {

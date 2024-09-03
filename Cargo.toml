@@ -24,3 +24,5 @@ derive_more = { version = "0.99.17" }
 uuid = { version = "1.10.0", features = ["v4"] }
 tower-http = { version = "0.5.2", features = ["fs"] }
 futures-util = { version = "0.3.30" }
+tower-sessions = { version = "0.12.3" }
+tower-sessions-redis-store = { version = "0.13.0" }
