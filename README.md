@@ -18,7 +18,7 @@ The Rust template engine. Inspired by Jinja2/Django and also used in Loco and Zo
 
 **PostgreSQl** as the Database
 
-I see PostgreSQL as a grown MySQL / MariaDB. Full ACID compliance and perfectly suited for scenarios with more complex queries and concurrency requirements.
+I see PostgreSQL as a grown MySQL / MariaDB. Full ACID compliance and suited for scenarios with more complex queries and concurrency requirements.
 
 **Redis** for Session Storage (Development: in-memory)
 
