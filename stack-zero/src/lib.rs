@@ -13,6 +13,7 @@ use jwt::jwk::JwkSet;
 use sea_orm::{Database, DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
+use session::SessionStore;
 use tokio::task::JoinHandle;
 use tower_http::services::ServeDir;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
@@ -41,9 +42,8 @@ pub struct StackZero {
     pub config: Config,
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
+    pub session_store: SessionStore,
     pub db_connection: DatabaseConnection,
-    pub redis_pool: RedisPool,
-    pub redis_connection: JoinHandle<Result<(), RedisError>>,
     pub template_renderer: ViewRenderer,
 }
 
@@ -52,6 +52,16 @@ pub enum Environment {
     #[default]
     Development,
     Production,
+}
+
+impl Environment {
+    /// Cookies should be usable only over HTTPS?
+    pub fn use_secure_cookies(&self) -> bool {
+        match self {
+            Environment::Development => false,
+            Environment::Production => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -69,16 +79,6 @@ impl Default for Config {
     }
 }
 
-impl Config {
-    /// Cookies should be usable only over HTTPS?
-    pub fn use_secure_cookies(&self) -> bool {
-        match self.environment {
-            Environment::Development => false,
-            Environment::Production => true,
-        }
-    }
-}
-
 impl StackZero {
     pub async fn new(config: Config) -> Result<Self> {
         let template_renderer = ViewRenderer::from_dir(&config.template_dir)?;
@@ -91,21 +91,13 @@ impl StackZero {
 
         let database = Database::connect(env::var("DATABASE_URL")?).await?;
 
-        let redis_config = RedisConfig::default();
-
-        let pool = RedisPool::new(RedisConfig::default(), None, None, None, 6)?;
-
-        let redis_conn = pool.connect();
-        pool.wait_for_connect()
-            .await
-            .with_context(|| format!("Connecting Redis pool: {:?}", redis_config.server))?;
+        let session_store = SessionStore::from_env(config.environment).await?;
 
         Ok(Self {
             config,
             auth0,
             jwk_set,
-            redis_pool: pool,
-            redis_connection: redis_conn,
+            session_store,
             db_connection: database,
             template_renderer,
         })
@@ -120,18 +112,13 @@ impl StackZero {
 
         // let session_store = MemoryStore::default();
 
-        let session_store = RedisStore::new(self.redis_pool.clone());
-
-        let session_layer = SessionManagerLayer::new(session_store)
-            .with_secure(self.config.use_secure_cookies())
-            // TODO: configure?
-            .with_expiry(Expiry::OnInactivity(Duration::seconds(20)));
-
-        router
+        let router = router
             .route("/login", get(login))
             .route("/callback", get(callback))
-            .nest_service("/static", static_files_service)
-            .layer(session_layer)
+            .nest_service("/static", static_files_service);
+
+        self.session_store
+            .add_layer(self.config.environment, router)
     }
 
     pub fn render(&self, key: &str, data: impl Serialize) -> Result<String> {
