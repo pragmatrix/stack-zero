@@ -3,37 +3,54 @@ use chrono::{DateTime, FixedOffset};
 use entity::user;
 use sea_orm::{prelude::*, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
 
-pub async fn get_or_create(
+#[derive(Debug, Clone)]
+pub enum AuthenticationMethod {
+    SingleSignOn,
+    Password(String),
+}
+
+/// Create a new user.
+pub async fn create(
     connection: &DatabaseConnection,
-    user_name: &str,
-    user_email: &str,
+    name: &str,
+    email: &str,
+    authentication_method: AuthenticationMethod,
     date: DateTime<FixedOffset>,
 ) -> Result<user::Model> {
-    let txn = connection.begin().await?;
-
-    let user = user::Entity::find()
-        .filter(user::Column::Email.eq(user_email))
-        .one(&txn)
-        .await?;
-
-    if let Some(user) = user {
-        return Ok(user);
-    }
+    let password = match authentication_method {
+        AuthenticationMethod::SingleSignOn => "".into(),
+        AuthenticationMethod::Password(pw) => password_auth::generate_hash(&pw),
+    };
 
     let new_user = user::Model {
         id: Uuid::new_v4(),
-        name: user_name.into(),
-        email: user_email.into(),
+        name: name.into(),
+        email: email.into(),
         creation_date: date,
+        password,
     };
 
-    user::Entity::insert(user::ActiveModel::from(new_user.clone()))
-        .exec(&txn)
-        .await?;
+    {
+        let txn = connection.begin().await?;
 
-    txn.commit().await?;
+        user::Entity::insert(user::ActiveModel::from(new_user.clone()))
+            .exec(&txn)
+            .await?;
+
+        txn.commit().await?;
+    }
 
     Ok(new_user)
+}
+
+pub async fn get_by_email(
+    connection: &DatabaseConnection,
+    user_email: &str,
+) -> Result<Option<user::Model>> {
+    Ok(user::Entity::find()
+        .filter(user::Column::Email.eq(user_email))
+        .one(connection)
+        .await?)
 }
 
 #[cfg(test)]
@@ -48,6 +65,8 @@ mod tests {
 
     use crate::test_helper::postgres_container;
 
+    use super::AuthenticationMethod;
+
     #[rstest]
     #[tokio::test]
     #[ignore = "manually only"]
@@ -59,8 +78,14 @@ mod tests {
 
         let _database = Database::connect(env::var("DATABASE_URL")?).await?;
 
-        let user =
-            super::get_or_create(&_database, "John Doe", "john@doe.com", Utc::now().into()).await?;
+        let user = super::create(
+            &_database,
+            "John Doe",
+            "john@doe.com",
+            AuthenticationMethod::SingleSignOn,
+            Utc::now().into(),
+        )
+        .await?;
 
         println!("User in db: {user:?}");
 

@@ -11,6 +11,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub email: String,
     pub creation_date: DateTime<FixedOffset>,
+    pub password: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

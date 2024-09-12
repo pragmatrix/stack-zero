@@ -1,4 +1,5 @@
 use axum::response::{Html, IntoResponse, Redirect, Response};
+use serde::Serialize;
 
 use crate::AppError;
 

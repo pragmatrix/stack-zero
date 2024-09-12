@@ -9,14 +9,10 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .create_table(
-                Table::create()
+            .alter_table(
+                Table::alter()
                     .table(User::Table)
-                    .if_not_exists()
-                    .col(uuid(User::Id).primary_key())
-                    .col(string(User::Name))
-                    .col(string(User::Email).unique_key())
-                    .col(timestamp_with_time_zone(User::CreationDate))
+                    .add_column(string(User::Password).default(""))
                     .to_owned(),
             )
             .await
@@ -24,7 +20,12 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(User::Table).to_owned())
+            .alter_table(
+                Table::alter()
+                    .table(User::Table)
+                    .drop_column(User::Password)
+                    .to_owned(),
+            )
             .await
     }
 }

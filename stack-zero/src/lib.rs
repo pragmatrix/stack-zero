@@ -239,10 +239,11 @@ async fn authorized(authorization_code: &str, config: &StackZero) -> Result<impl
             println!("Token successfully validated, inserting user");
             let connection = &config.db_connection;
             let claims = &token.claims;
-            let user = users::get_or_create(
+            let user = users::create(
                 connection,
                 &claims.profile.name,
                 &claims.email.email,
+                users::AuthenticationMethod::SingleSignOn,
                 Utc::now().into(),
             )
             .await?;
