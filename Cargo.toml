@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["stack-zero", "migration", "entity"]
+members = ["stack-zero", "migration", "entity", "api"]
 
 [workspace.dependencies]
 dotenv = "0.15.0"

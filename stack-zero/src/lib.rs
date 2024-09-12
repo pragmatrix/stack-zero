@@ -4,7 +4,7 @@ use ::anyhow::{Context, Result};
 use axum::{
     extract::{FromRef, Query, State},
     response::{IntoResponse, Redirect},
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use chrono::Utc;
@@ -19,13 +19,17 @@ use tower_http::services::ServeDir;
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
 use tower_sessions_redis_store::{fred::prelude::*, RedisStore};
 use url::Url;
+use utoipa::OpenApi;
+use utoipa_scalar::{Scalar, Servable};
 
 use crate::id_token::IdToken;
 use user::users;
 use view_renderer::*;
 
 mod anyhow;
+mod api;
 mod auth0;
+mod email_verification;
 mod identity;
 pub mod respond;
 mod session;
@@ -66,13 +70,16 @@ impl Environment {
 
 #[derive(Debug, Clone)]
 pub struct Config {
+    /// Used for example in Email verification link generation.
+    pub base_url: Url,
     pub template_dir: PathBuf,
     pub environment: Environment,
 }
 
-impl Default for Config {
-    fn default() -> Self {
+impl Config {
+    pub fn from_base_url(url: Url) -> Self {
         Self {
+            base_url: url,
             template_dir: "assets".into(),
             environment: Environment::default(),
         }
@@ -115,7 +122,9 @@ impl StackZero {
         let router = router
             .route("/login", get(login))
             .route("/callback", get(callback))
-            .nest_service("/static", static_files_service);
+            .nest_service("/static", static_files_service)
+            .route("/api/sign-up", post(api::sign_up))
+            .merge(Scalar::with_url("/api", api::Doc::openapi()));
 
         self.session_store
             .add_layer(self.config.environment, router)
