@@ -28,6 +28,9 @@ tower-sessions-redis-store = { workspace = true }
 password-auth = "1.0.0"
 utoipa = "4.2.3"
 utoipa-scalar = { version = "0.1.0", features = ["axum"] }
+validator = { version = "0.18.1" }
+# Email
+css-inline = { version = "0.14.1" }
 
 [dev-dependencies]
 bollard = { workspace = true }

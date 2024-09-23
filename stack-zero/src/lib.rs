@@ -29,7 +29,7 @@ use view_renderer::*;
 mod anyhow;
 mod api;
 mod auth0;
-mod email_verification;
+mod email;
 mod identity;
 pub mod respond;
 mod session;
@@ -44,6 +44,7 @@ pub use identity::*;
 #[derive(Debug)]
 pub struct StackZero {
     pub config: Config,
+    pub smtp_config: email::config::Smtp,
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
     pub session_store: SessionStore,

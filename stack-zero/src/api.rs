@@ -6,10 +6,13 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use css_inline::CSSInliner;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use utoipa::OpenApi;
+use validator::Validate;
 
-use crate::{AppError, StackZero};
+use crate::{email_verification, AppError, StackZero};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -36,9 +39,30 @@ pub async fn sign_up(
     State(state): State<Arc<StackZero>>,
     Json(sign_up): Json<api::SignUp>,
 ) -> Result<Response, AppError> {
+    sign_up.validate()?;
+
     println!("{sign_up:?}");
-    todo!();
-    Ok((StatusCode::CREATED, ()).into_response())
+
+    let verification_link = email_verification::link(&state.config.base_url, &sign_up.email)?;
+
+    let email = sign_up.email;
+
+    let site = &state.config.base_url;
+
+    let email = state.render(
+        "emails/email_verification",
+        json! {{"site": site, "name": email, "email": email}},
+    )?;
+
+    // TODO: cache inlining?
+
+    let inliner = CSSInliner::default();
+    let email = inliner.inline(&email)?;
+
+    
+
+
+    Ok((StatusCode::ACCEPTED, ()).into_response())
 }
 
 #[derive(Serialize, Deserialize)]
