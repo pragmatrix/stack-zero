@@ -1,2 +1,4 @@
-pub(crate) mod config;
-mod verification;
+mod config;
+pub mod verification;
+
+pub use config::*;

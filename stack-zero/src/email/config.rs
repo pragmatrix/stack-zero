@@ -7,7 +7,7 @@ use url::Url;
 const DEFAULT_SMTP_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Smtp {
+pub struct Config {
     /// Server and (optionally a port)
     server: String,
     credentials: ConnectionCredentials,
@@ -31,7 +31,7 @@ pub struct EffectiveSmtp {
     timeout: Duration,
 }
 
-impl Smtp {
+impl Config {
     pub fn into_effective(self, site: &Url) -> Result<EffectiveSmtp> {
         let (server, port) = self.effective_server_and_port()?;
         let timeout = self.effective_timeout();
@@ -93,7 +93,7 @@ impl Smtp {
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 enum ConnectionSecurity {
     #[default]
     Tls,

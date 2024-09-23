@@ -12,7 +12,7 @@ use serde_json::json;
 use utoipa::OpenApi;
 use validator::Validate;
 
-use crate::{email_verification, AppError, StackZero};
+use crate::{email, AppError, StackZero};
 
 #[derive(OpenApi)]
 #[openapi(
@@ -43,7 +43,7 @@ pub async fn sign_up(
 
     println!("{sign_up:?}");
 
-    let verification_link = email_verification::link(&state.config.base_url, &sign_up.email)?;
+    let verification_link = email::verification::link(&state.config.base_url, &sign_up.email)?;
 
     let email = sign_up.email;
 
@@ -58,9 +58,6 @@ pub async fn sign_up(
 
     let inliner = CSSInliner::default();
     let email = inliner.inline(&email)?;
-
-    
-
 
     Ok((StatusCode::ACCEPTED, ()).into_response())
 }

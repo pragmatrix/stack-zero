@@ -1,4 +1,4 @@
-use std::{default, env, path::PathBuf, sync::Arc};
+use std::{default, env, fs, path::PathBuf, sync::Arc};
 
 use ::anyhow::{Context, Result};
 use axum::{
@@ -29,6 +29,7 @@ use view_renderer::*;
 mod anyhow;
 mod api;
 mod auth0;
+mod config;
 mod email;
 mod identity;
 pub mod respond;
@@ -44,7 +45,7 @@ pub use identity::*;
 #[derive(Debug)]
 pub struct StackZero {
     pub config: Config,
-    pub smtp_config: email::config::Smtp,
+    pub smtp_config: email::Config,
     pub auth0: auth0::Config,
     pub jwk_set: JwkSet,
     pub session_store: SessionStore,
@@ -73,6 +74,8 @@ impl Environment {
 pub struct Config {
     /// Used for example in Email verification link generation.
     pub base_url: Url,
+    pub config_file: PathBuf,
+    // TODO: read this from the config file.
     pub template_dir: PathBuf,
     pub environment: Environment,
 }
@@ -81,6 +84,7 @@ impl Config {
     pub fn from_base_url(url: Url) -> Self {
         Self {
             base_url: url,
+            config_file: "stack-zero.toml".into(),
             template_dir: "assets".into(),
             environment: Environment::default(),
         }
@@ -89,10 +93,18 @@ impl Config {
 
 impl StackZero {
     pub async fn new(config: Config) -> Result<Self> {
+        let stack_zero_conf: config::Config = {
+            let file = &config.config_file;
+            let file = fs::read_to_string(file)
+                .with_context(|| format!("Failed to read configuration file from {:?}", file))?;
+            toml::from_str(&file)?
+        };
+
         let template_renderer = ViewRenderer::from_dir(&config.template_dir)?;
 
-        let auth0 = auth0::Config::from_env()?;
+        // TODO: load auth0 config from stack-zero.conf
 
+        let auth0 = auth0::Config::from_env()?;
         let jwk_set = auth0.download_jwk_set().await?;
 
         println!("jwk set: {:?}", jwk_set);
@@ -103,6 +115,7 @@ impl StackZero {
 
         Ok(Self {
             config,
+            smtp_config: stack_zero_conf.smtp,
             auth0,
             jwk_set,
             session_store,

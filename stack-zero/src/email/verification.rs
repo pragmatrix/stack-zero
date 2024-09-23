@@ -8,7 +8,7 @@ use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// TODO: Use a toml file for configuration?
+// TODO: Add this to the configuration?
 const EMAIL_VERIFICATION_EXPIRATION: Duration = Duration::from_secs(15 * 60);
 
 // Define the claims structure
