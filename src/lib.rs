@@ -8,6 +8,7 @@ use axum::{
     Router,
 };
 use chrono::Utc;
+use env_renderer::EnvRenderer;
 use jsonwebtoken as jwt;
 use jwt::jwk::JwkSet;
 use sea_orm::{Database, DatabaseConnection, EntityTrait};
@@ -31,6 +32,7 @@ mod api;
 mod auth0;
 mod config;
 mod email;
+mod env_renderer;
 mod identity;
 pub mod respond;
 mod session;
@@ -93,11 +95,14 @@ impl Config {
 
 impl StackZero {
     pub async fn new(config: Config) -> Result<Self> {
+        let env_renderer = EnvRenderer::from_env();
+
         let stack_zero_conf: config::Config = {
             let file = &config.config_file;
-            let file = fs::read_to_string(file)
+            let toml = fs::read_to_string(file)
                 .with_context(|| format!("Failed to read configuration file from {:?}", file))?;
-            toml::from_str(&file)?
+            let with_env = env_renderer.render(&toml)?;
+            toml::from_str(&with_env)?
         };
 
         let template_renderer = ViewRenderer::from_dir(&config.template_dir)?;
