@@ -8,7 +8,7 @@ use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// TODO: Use a toml file for configuration?
+// TODO: Add this to the configuration?
 const EMAIL_VERIFICATION_EXPIRATION: Duration = Duration::from_secs(15 * 60);
 
 // Define the claims structure
@@ -18,13 +18,15 @@ struct Claims {
     exp: u64,
 }
 
-fn generate_email_verification_link(endpoint: &Url, email: &str) -> Result<Url> {
+pub fn link(endpoint: &Url, email: &str) -> Result<Url> {
     let jwt_secret = env::var("JWT_SECRET").context("JWT_SECRET not set")?;
-    let jwt = generate_jwt(email, &jwt_secret)?;
-    Ok(endpoint.join(&format!("&t={}", jwt))?)
+    let jwt = jwt(email, &jwt_secret)?;
+    let mut endpoint = endpoint.clone();
+    endpoint.query_pairs_mut().append_pair("t", &jwt);
+    Ok(endpoint)
 }
 
-fn generate_jwt(email: &str, secret_base64: &str) -> Result<String> {
+fn jwt(email: &str, secret_base64: &str) -> Result<String> {
     let expiration = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")

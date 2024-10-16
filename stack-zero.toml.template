@@ -1,0 +1,7 @@
+
+
+
+[smtp]
+server = "smtp.sendgrid.net"
+username = "mail"
+password = ""
