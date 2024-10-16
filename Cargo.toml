@@ -1,6 +1,45 @@
+[package]
+name = "stack-zero"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+entity = { path = "entity" }
+api = { path = "api" }
+
+axum = { workspace = true }
+tokio = { workspace = true }
+dotenv = { workspace = true }
+anyhow = { workspace = true }
+url = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde-enum-str = { workspace = true }
+jsonwebtoken = { workspace = true }
+chrono = { workspace = true }
+derive_more = { workspace = true }
+sea-orm = { workspace = true }
+tera = { workspace = true }
+tower-http = { workspace = true }
+futures-util = { workspace = true }
+tower-sessions = { workspace = true }
+tower-sessions-redis-store = { workspace = true }
+password-auth = "1.0.0"
+utoipa = "4.2.3"
+utoipa-scalar = { version = "0.1.0", features = ["axum"] }
+validator = { version = "0.18.1" }
+# Email
+css-inline = { version = "0.14.1" }
+toml = { version = "0.8.9" }
+
+[dev-dependencies]
+bollard = { workspace = true }
+rstest = { workspace = true }
+
 [workspace]
 resolver = "2"
-members = ["stack-zero", "migration", "entity", "api"]
+members = ["migration", "entity", "api"]
 
 [workspace.dependencies]
 dotenv = "0.15.0"

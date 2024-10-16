@@ -21,7 +21,10 @@ impl FromRef<MyState> for Arc<StackZero> {
 async fn main() -> Result<()> {
     dotenv()?;
 
-    let stack_zero = StackZero::new(Config::default()).await?;
+    let stack_zero = StackZero::new(Config::from_base_url(
+        "https://www.example.com".parse().unwrap(),
+    ))
+    .await?;
 
     let app = Router::new();
     let app = stack_zero.install_routes(app).with_state(MyState {
